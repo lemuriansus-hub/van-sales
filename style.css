@@ -1,3 +1,20 @@
+/* Fonts are bundled so they work offline: Manrope for English and numbers, Noto Sans Tamil for Tamil. */
+@font-face {
+  font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url(fonts/manrope-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url(fonts/manrope-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Noto Sans Tamil'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url(fonts/noto-sans-tamil.woff2) format('woff2');
+  unicode-range: U+0964-0965, U+0B82-0BFA, U+200C-200D, U+25CC;
+}
+
 /* Light theme only, primary #149884. */
 :root {
   color-scheme: light;
@@ -19,7 +36,7 @@ html, body { margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.4 system-ui, -apple-system, "Noto Sans Tamil", sans-serif;
+  font: 16px/1.45 'Manrope', 'Noto Sans Tamil', system-ui, sans-serif;
   padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
 button, input, select { font: inherit; color: inherit; }
@@ -122,4 +139,4 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .toast.show { opacity: 1; }
 
-pre.summary { white-space: pre-wrap; font: 14px/1.5 ui-monospace, monospace; margin: 0; }
+pre.summary { white-space: pre-wrap; font: 14px/1.6 'Manrope', 'Noto Sans Tamil', sans-serif; margin: 0; }

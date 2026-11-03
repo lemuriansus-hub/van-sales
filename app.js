@@ -551,12 +551,12 @@ function summaryText(day) {
 }
 
 // Saves the day to history and starts the next one with the return stock as opening (locked).
-function closeDay() {
+function closeDay(nextDate) {
   const prev = S(), c = calc(prev);
   const open = {};
   c.rows.forEach(r => { if (r.closing) open[r.it.id] = r.closing; });
   state.history.unshift(prev);
-  let next = today();
+  let next = nextDate || today();
   if (next <= prev.date) {
     const n = new Date(prev.date + 'T00:00'); n.setDate(n.getDate() + 1);
     next = new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -635,7 +635,7 @@ document.addEventListener('input', e => {
     case 'itemTa': state.items[el.dataset.i].ta = el.value; break;
     case 'itemPrice': state.items[el.dataset.i].price = num(el.value); break;
     case 'info': day.info = day.info || {}; day.info[id] = el.value; break;
-    case 'date': if (el.value) { day.date = el.value; $('#topDate').textContent = fmtDate(day.date); } break;
+    case 'date': return;   // handled on 'change' below
   }
   if (!['customer', 'qty', 'dcash', 'dupi'].includes(f)) save();
   refresh();
@@ -744,6 +744,22 @@ document.addEventListener('click', e => {
       break;
     }
   }
+});
+
+// Picking a later date starts that day: today's sheet is saved and its return becomes the opening stock.
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.f !== 'date') return;
+  const day = S(), picked = el.value;
+  if (!picked || picked === day.date) return;
+  if (picked > day.date && hasActivity(day)) {
+    if (confirm(`${fmtDate(day.date)} கணக்கை முடித்து, ரிட்டன் இருப்புடன் ${fmtDate(picked)} தொடங்கவா?\n\nClose ${fmtDate(day.date)} and start ${fmtDate(picked)} with the return stock?`)) closeDay(picked);
+    else el.value = day.date;
+    return;
+  }
+  day.date = picked;   // no sales yet, or correcting to an earlier date: just change the date
+  save();
+  $('#topDate').textContent = fmtDate(day.date);
 });
 
 document.addEventListener('change', e => {

@@ -170,14 +170,25 @@ VIEWS.stock = () => `
       <thead><tr><th>பொருள்<br>Item</th><th>வ.இருப்பு<br>Opening</th><th>எடுத்தது<br>Taken</th><th>மொத்தம்<br>Total</th></tr></thead>
       <tbody>${state.items.map(it => `
         <tr><td>${esc(it.ta)}</td>
-        <td><input class="n" inputmode="numeric" data-f="open" data-id="${it.id}" value="${S().open[it.id] || ''}" placeholder="0"></td>
-        <td><input class="n" inputmode="numeric" data-f="taken" data-id="${it.id}" value="${S().taken[it.id] || ''}" placeholder="0"></td>
+        <td><input class="n" inputmode="numeric" data-f="open" data-id="${it.id}" value="${S().open[it.id] || ''}" placeholder="0" ${S().lockOpen ? 'disabled' : ''}></td>
+        <td><input class="n" inputmode="numeric" data-f="taken" data-id="${it.id}" value="${S().taken[it.id] || ''}" placeholder="0" ${S().lockTaken ? 'disabled' : ''}></td>
         <td data-o="t_${it.id}"></td></tr>`).join('')}
       </tbody>
       <tfoot><tr><td>மொத்தம்</td><td data-o="openSum"></td><td data-o="takenSum"></td><td data-o="totalSum"></td></tr></tfoot>
     </table>
+    ${lockButton('Open', 'வ.இருப்பு', 'Opening stock')}
+    ${lockButton('Taken', 'எடுத்தது', 'Taken')}
   </div>
   <button class="btn wide" data-go="deliver">விநியோகம் தொடங்கு / Start delivery →</button>`;
+
+function lockButton(part, ta, en) {
+  return S()['lock' + part]
+    ? `<div class="row" style="margin-top:10px"><span class="grow">🔒 ${ta} உறுதி செய்யப்பட்டது <span class="en">${en} locked</span></span>
+        <button class="btn ghost" data-unlock="${part}">திற / Unlock</button></div>`
+    : `<button class="btn wide" style="margin-top:10px" data-lock="${part}">✔ ${ta} உறுதி செய் / Confirm ${en.toLowerCase()}</button>`;
+}
+
+const pin = () => state.pin || '1234';
 
 OUTPUTS.stock = () => {
   const c = calc(S()), o = {};
@@ -234,7 +245,8 @@ VIEWS.deliver = () => {
       <input class="n" style="width:110px" inputmode="numeric" data-f="dupi" value="${esc(draft.upi)}" placeholder="0"></div>
     <div class="row" style="margin-top:10px"><span class="grow" data-o="dBal"></span></div>
   </div>
-  <button class="btn wide" data-act="confirm" data-dis="noConfirm">✔ உறுதி செய் / Confirm</button>
+  <div class="muted" data-o="needs" style="color:var(--bad);margin-bottom:6px"></div>
+  <button class="btn wide" data-act="confirm" data-cls="confirmCls">✔ உறுதி செய் / Confirm</button>
   ${draft.editId ? `<div class="btns"><button class="btn ghost" data-act="cancelEdit">ரத்து / Cancel</button><button class="btn danger" data-act="delDelivery">நீக்கு / Delete</button></div>` : ''}
   ${S().deliveries.length ? `<h2>இன்றைய விநியோகம் <small>Today's deliveries (${S().deliveries.length})</small></h2>
   <div class="card">${[...S().deliveries].reverse().map(deliveryRow).join('')}</div>` : ''}`;
@@ -275,12 +287,31 @@ OUTPUTS.deliver = () => {
   const editing = draft.editId && S().deliveries.find(d => d.id === draft.editId);
   const prevDue = due - (editing ? editing.total - paid(editing) : 0);
   o.oldDue = prevDue > 0 ? `பழைய பாக்கி / Old due: <b>${rs(prevDue)}</b>` : '';
-  o.noConfirm = over || !total || !draft.customer.trim();
+  o.needs = deliveryProblem(over, total) || '';
+  o.confirmCls = 'btn wide' + (o.needs ? ' ghost' : '');
   o.bigCls = 'big' + (over ? ' bad' : '');
   return o;
 };
 
+function deliveryProblem(over, total) {
+  if (!draft.customer.trim()) return 'மேலே வாடிக்கையாளர் பெயர் எழுதவும் / Enter the customer name at the top';
+  if (!total) return 'பொருள் தேர்வு செய்யவும் / Pick at least one item';
+  if (over) return 'வண்டியில் உள்ளதை விட அதிகம் / More than the stock in the van';
+  return null;
+}
+
 function confirmDelivery() {
+  const over = state.items.some(it => num(draft.qty[it.id]) > available(it.id));
+  const problem = deliveryProblem(over, draftTotal());
+  if (problem) {
+    toast(problem);
+    if (!draft.customer.trim()) {
+      const el = document.querySelector('[data-f=customer]');
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.focus();
+    }
+    return;
+  }
   const lines = state.items.filter(it => num(draft.qty[it.id])).map(it => ({ id: it.id, qty: num(draft.qty[it.id]), price: it.price }));
   const total = sum(lines.map(l => l.qty * l.price));
   const rec = { customer: draft.customer.trim(), lines, total, cash: num(draft.cash), upi: num(draft.upi) };
@@ -439,6 +470,15 @@ VIEWS.more = () => {
     <div class="muted" style="margin-top:6px">விலை மாற்றம் புதிய விநியோகத்திற்கு மட்டும். / Price changes apply to new deliveries only.</div>
   </div>
 
+  <h2>PIN மாற்று <small>Change stock lock PIN</small></h2>
+  <div class="card">
+    <input id="pinOld" type="password" inputmode="numeric" placeholder="பழைய PIN / Old PIN" autocomplete="off">
+    <div class="row" style="margin-top:8px">
+      <input id="pinNew" type="password" inputmode="numeric" placeholder="புதிய PIN / New PIN" autocomplete="off">
+      <button class="btn" data-act="changePin">மாற்று / Save</button>
+    </div>
+  </div>
+
   <h2>காப்பு <small>Backup</small></h2>
   <div class="card">
     <div class="btns">
@@ -529,6 +569,22 @@ document.addEventListener('click', e => {
     render(); window.scrollTo(0, 0); return;
   }
 
+  if (d.lock) {
+    const ta = d.lock === 'Open' ? 'வ.இருப்பு / opening stock' : 'எடுத்தது / taken';
+    if (confirm(`${ta} உறுதி செய்து பூட்டவா? / Confirm and lock?`)) {
+      S()['lock' + d.lock] = true; save(); render(); toast('🔒 பூட்டப்பட்டது / Locked');
+    }
+    return;
+  }
+
+  if (d.unlock) {
+    const p = prompt('PIN எண் / Enter PIN');
+    if (p === null) return;
+    if (p === pin()) { S()['lock' + d.unlock] = false; save(); render(); toast('🔓 திறக்கப்பட்டது / Unlocked'); }
+    else toast('தவறான PIN / Wrong PIN');
+    return;
+  }
+
   if (d.delrec) { S().received.splice(+d.delrec, 1); save(); render(); return; }
 
   if (d.hist) {
@@ -596,6 +652,13 @@ document.addEventListener('click', e => {
       break;
     }
     case 'import': $('#importFile').click(); break;
+    case 'changePin': {
+      const oldP = $('#pinOld').value, newP = $('#pinNew').value.trim();
+      if (oldP !== pin()) { toast('பழைய PIN தவறு / Old PIN is wrong'); break; }
+      if (!/^\d{4,8}$/.test(newP)) { toast('4–8 எண்கள் / Use 4–8 digits'); break; }
+      state.pin = newP; save(); render(); toast('PIN மாற்றப்பட்டது / PIN changed');
+      break;
+    }
   }
 });
 

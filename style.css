@@ -139,4 +139,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 }
 .toast.show { opacity: 1; }
 
+.sheet-img { width: 100%; aspect-ratio: 210 / 297; display: block; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+input[type=time] { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-height: 44px; }
+details summary { cursor: pointer; padding: 6px 0; }
+
 pre.summary { white-space: pre-wrap; font: 14px/1.6 'Manrope', 'Noto Sans Tamil', sans-serif; margin: 0; }

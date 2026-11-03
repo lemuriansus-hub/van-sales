@@ -17,13 +17,14 @@ const DEFAULT_ITEMS = [
   { id: 'chips',    ta: 'சிப்ஸ்',           en: 'Chips',         price: 40 },
 ];
 
+// Same order as the printed sheet.
 const EXPENSES = [
-  { id: 'rent',    ta: 'வாடகை',    en: 'Rent' },
-  { id: 'petrol',  ta: 'பெட்ரோல்', en: 'Petrol' },
-  { id: 'diesel',  ta: 'டீசல்',    en: 'Diesel' },
-  { id: 'batta',   ta: 'பேட்டா',   en: 'Batta' },
-  { id: 'magamai', ta: 'மகமை',     en: 'Magamai' },
-  { id: 'other',   ta: 'இதர',      en: 'Other' },
+  { id: 'rent',     ta: 'வாடகை',    en: 'Rent' },
+  { id: 'poopathi', ta: 'பூபத்தி',   en: 'Poopathi' },
+  { id: 'petrol',   ta: 'பெட்ரோல்', en: 'Petrol' },
+  { id: 'diesel',   ta: 'டீசல்',    en: 'Diesel' },
+  { id: 'batta',    ta: 'பேட்டா',   en: 'Batta' },
+  { id: 'magamai',  ta: 'மகமை',     en: 'Magamai' },
 ];
 
 const NOTES = [500, 200, 100, 50, 20, 10, 5];
@@ -33,9 +34,9 @@ const today = () => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-const newDay = (date, open = {}) => ({
+const newDay = (date, open = {}, info = {}) => ({
   date, open, taken: {}, deliveries: [], received: [],
-  exp: {}, discount: 0, damage: 0, cash: {}, upiCount: null,
+  exp: {}, discount: 0, damage: 0, cash: {}, upiCount: null, info,
 });
 
 let state = load();
@@ -136,6 +137,7 @@ function render() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   $('#view').innerHTML = VIEWS[tab]();
   refresh();
+  if (tab === 'more') showPreview('cur', 'sheetPreview');
 }
 
 // Update only computed text, so typing never loses focus.
@@ -159,10 +161,27 @@ const VIEWS = {};
 const OUTPUTS = {};
 
 /* Stock */
-VIEWS.stock = () => `
+const INFO = [
+  { id: 'name',    ta: 'பெயர்',              en: 'Name',        type: 'text' },
+  { id: 'town',    ta: 'ஊர்',                en: 'Town',        type: 'text' },
+  { id: 'start',   ta: 'புறப்பட்ட நேரம்',    en: 'Start time',  type: 'time' },
+  { id: 'end',     ta: 'வந்து சேர்ந்த நேரம்', en: 'Return time', type: 'time' },
+  { id: 'startKm', ta: 'வாகன ஆரம்ப கி.மீ',   en: 'Start km',    type: 'num' },
+  { id: 'endKm',   ta: 'வாகன முடிவு கி.மீ',  en: 'End km',      type: 'num' },
+];
+
+VIEWS.stock = () => {
+  const info = S().info || {};
+  return `
   <div class="card">
     <div class="row"><label class="grow">தேதி <span class="en">Date</span></label>
     <input type="date" style="width:auto" data-f="date" value="${S().date}"></div>
+    <details style="margin-top:8px">
+      <summary class="link">தாள் விவரம் <span class="en">Sheet details (name, town, time, km)</span></summary>
+      ${INFO.map(f => `<div class="row"><label class="grow">${f.ta} <span class="en">${f.en}</span></label>
+        <input style="width:150px" ${f.type === 'time' ? 'type="time"' : f.type === 'num' ? 'inputmode="numeric"' : ''}
+          data-f="info" data-id="${f.id}" value="${esc(info[f.id] || '')}"></div>`).join('')}
+    </details>
   </div>
   <h2>வண்டியில் இருப்பு <small>Stock in van</small></h2>
   <div class="card">
@@ -179,7 +198,9 @@ VIEWS.stock = () => `
     ${lockButton('Open', 'வ.இருப்பு', 'Opening stock')}
     ${lockButton('Taken', 'எடுத்தது', 'Taken')}
   </div>
+  <div class="muted" style="margin:-4px 0 10px">வ.இருப்பு = நேற்றைய ரிட்டன் (தானாக வரும்) / Opening = yesterday's return (filled automatically)</div>
   <button class="btn wide" data-go="deliver">விநியோகம் தொடங்கு / Start delivery →</button>`;
+};
 
 function lockButton(part, ta, en) {
   return S()['lock' + part]
@@ -414,7 +435,10 @@ VIEWS.amount = () => {
     <div class="row"><span class="grow">போன் பே <span class="en">PhonePe total</span></span>
       <input class="n" style="width:110px" inputmode="numeric" data-f="upiCount" value="${day.upiCount ?? ''}" data-ph="upiPh"></div>
     <div class="row chain final"><span class="grow">மொத்தம் <span class="en">Counted</span></span><span data-o="counted"></span></div>
-  </div>`;
+  </div>
+
+  <h2>விற்பனை தாள் <small>Download today's sheet</small></h2>
+  <div class="card">${sheetButtons('cur')}</div>`;
 };
 
 OUTPUTS.amount = () => {
@@ -439,6 +463,12 @@ OUTPUTS.amount = () => {
 VIEWS.more = () => {
   const dues = Object.entries(customerDues()).filter(([n, v]) => n && v > 0).sort((a, b) => b[1] - a[1]);
   return `
+  <h2>இன்றைய விற்பனை தாள் <small>Today's sales sheet</small></h2>
+  <div class="card">
+    <img id="sheetPreview" class="sheet-img" alt="Sales sheet preview">
+    ${sheetButtons('cur')}
+  </div>
+
   <h2>இன்றைய சுருக்கம் <small>Today's summary</small></h2>
   <div class="card"><pre class="summary">${esc(summaryText(S()))}</pre>
     <div class="btns"><button class="btn" data-act="share">WhatsApp / Share</button></div></div>
@@ -520,6 +550,69 @@ function summaryText(day) {
   return L.join('\n');
 }
 
+// Saves the day to history and starts the next one with the return stock as opening (locked).
+function closeDay() {
+  const prev = S(), c = calc(prev);
+  const open = {};
+  c.rows.forEach(r => { if (r.closing) open[r.it.id] = r.closing; });
+  state.history.unshift(prev);
+  let next = today();
+  if (next <= prev.date) {
+    const n = new Date(prev.date + 'T00:00'); n.setDate(n.getDate() + 1);
+    next = new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+  const info = prev.info || {};
+  state.current = newDay(next, open, { name: info.name || '', startKm: info.endKm || '' });
+  state.current.lockOpen = Object.keys(open).length > 0;
+  draft = blankDraft(); save(); tab = 'stock'; render();
+  toast('புதிய நாள் – ரிட்டன் இருப்பு சேர்க்கப்பட்டது / New day – return stock added');
+}
+
+function hasActivity(day) {
+  return day.deliveries.length || Object.values(day.taken).some(Boolean);
+}
+
+// Opening the app on a later date: offer to close the old day so the return carries over.
+function startupCheck() {
+  const day = S();
+  if (day.date >= today()) return;
+  if (!hasActivity(day)) { day.date = today(); save(); render(); return; }
+  if (confirm(`${fmtDate(day.date)} கணக்கு இன்னும் முடிக்கவில்லை. முடித்து, ரிட்டன் இருப்புடன் இன்றைய நாளை தொடங்கவா?\n\n${fmtDate(day.date)} is still open. Close it and start today with the return stock?`)) closeDay();
+}
+
+function sheetDay(key) { return key === 'cur' || key === undefined ? S() : state.history[+key]; }
+
+async function downloadSheet(key, kind) {
+  const day = sheetDay(key);
+  toast('தயாராகிறது… / Preparing…');
+  const canvas = await drawSheet(day);
+  const name = `pasupathi-sales-${day.date}.${kind}`;
+  const blob = kind === 'png'
+    ? await new Promise(r => canvas.toBlob(r, 'image/png'))
+    : sheetPdf(canvas);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`${name} சேமிக்கப்பட்டது / downloaded`);
+}
+
+function sheetButtons(key) {
+  return `<div class="btns">
+    <button class="btn" data-act="png" data-day="${key}">⬇ PNG</button>
+    <button class="btn" data-act="pdf" data-day="${key}">⬇ PDF</button></div>`;
+}
+
+async function showPreview(key, imgId) {
+  const img = document.getElementById(imgId);
+  if (!img) return;
+  const canvas = await drawSheet(sheetDay(key));
+  img.src = canvas.toDataURL('image/jpeg', 0.8);
+}
+
 /* ---------- events ---------- */
 
 document.addEventListener('input', e => {
@@ -541,6 +634,7 @@ document.addEventListener('input', e => {
     case 'upiCount': day.upiCount = el.value === '' ? null : num(el.value); break;
     case 'itemTa': state.items[el.dataset.i].ta = el.value; break;
     case 'itemPrice': state.items[el.dataset.i].price = num(el.value); break;
+    case 'info': day.info = day.info || {}; day.info[id] = el.value; break;
     case 'date': if (el.value) { day.date = el.value; $('#topDate').textContent = fmtDate(day.date); } break;
   }
   if (!['customer', 'qty', 'dcash', 'dupi'].includes(f)) save();
@@ -588,7 +682,9 @@ document.addEventListener('click', e => {
   if (d.delrec) { S().received.splice(+d.delrec, 1); save(); render(); return; }
 
   if (d.hist) {
-    $('#histView').innerHTML = `<div class="card" style="margin-top:10px"><pre class="summary">${esc(summaryText(state.history[+d.hist]))}</pre></div>`;
+    $('#histView').innerHTML = `<div class="card" style="margin-top:10px">
+      <img id="histPreview" class="sheet-img" alt="Sales sheet">${sheetButtons(d.hist)}</div>`;
+    showPreview(d.hist, 'histPreview');
     return;
   }
 
@@ -619,22 +715,10 @@ document.addEventListener('click', e => {
       else window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
       break;
     }
-    case 'closeDay': {
-      if (!confirm('இன்றைய நாளை முடிக்கவா? / Close today and start a new day?')) break;
-      const c = calc(S());
-      const open = {};
-      c.rows.forEach(r => { if (r.closing) open[r.it.id] = r.closing; });
-      state.history.unshift(S());
-      let next = today();
-      if (next <= S().date) {
-        const n = new Date(S().date + 'T00:00'); n.setDate(n.getDate() + 1);
-        next = new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-      }
-      state.current = newDay(next, open);
-      draft = blankDraft(); save(); tab = 'stock'; render();
-      toast('புதிய நாள் / New day started');
+    case 'closeDay':
+      if (confirm('இன்றைய நாளை முடிக்கவா? / Close today and start a new day?')) closeDay();
       break;
-    }
+    case 'png': case 'pdf': downloadSheet(d.day, d.act); break;
     case 'addItem': {
       const ta = prompt('பொருள் பெயர் / Item name');
       if (!ta) break;
@@ -677,3 +761,4 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 render();
+startupCheck();

@@ -1,6 +1,6 @@
 // Offline cache. Bump VERSION whenever any file changes so phones get the update.
-const VERSION = 'van-v5';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
+const VERSION = 'van-v6';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'sheet.js', 'manifest.json', 'icon-192.png', 'icon-512.png',
   'fonts/manrope-latin.woff2', 'fonts/manrope-latin-ext.woff2', 'fonts/noto-sans-tamil.woff2'];
 
 self.addEventListener('install', e => {
